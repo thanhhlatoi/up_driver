@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model DriveAccount {
+  id                    String   @id @default(cuid())
+  name                  String
+  googleEmail           String?
+  refreshTokenEncrypted String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  folders        DriveFolder[]
+  uploadSessions UploadSession[]
+}
+
+model DriveFolder {
+  id             String   @id @default(cuid())
+  driveAccountId String
+  name           String
+  parentFolderId String
+  imagesFolderId String
+  videosFolderId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  driveAccount   DriveAccount    @relation(fields: [driveAccountId], references: [id], onDelete: Cascade)
+  uploadSessions UploadSession[]
+
+  @@unique([driveAccountId, name])
+  @@index([driveAccountId])
+}
+
+model UploadSession {
+  id             String    @id @default(cuid())
+  driveAccountId String
+  driveFolderId  String
+  mode           String
+  status         String
+  errorMessage   String?
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+
+  driveAccount DriveAccount @relation(fields: [driveAccountId], references: [id], onDelete: Cascade)
+  driveFolder  DriveFolder  @relation(fields: [driveFolderId], references: [id], onDelete: Cascade)
+  files        UploadFile[]
+
+  @@index([driveAccountId])
+  @@index([driveFolderId])
+}
+
+model UploadFile {
+  id              String    @id @default(cuid())
+  uploadSessionId String
+  fileName        String
+  mimeType        String?
+  category        String
+  status          String
+  driveFileId     String?
+  errorMessage    String?
+  createdAt       DateTime  @default(now())
+  completedAt     DateTime?
+
+  uploadSession UploadSession @relation(fields: [uploadSessionId], references: [id], onDelete: Cascade)
+
+  @@index([uploadSessionId])
+}

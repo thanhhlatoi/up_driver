@@ -1,36 +1,165 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Google Drive Upload Web Tool
 
-## Getting Started
+Web app for uploading local images and videos to selected Google Drive accounts and mapped top-level folders. Each mapped folder has fixed `Images` and `Videos` subfolders.
 
-First, run the development server:
+## Tech Stack
+
+- Next.js 16 App Router
+- TypeScript
+- Tailwind CSS
+- Google Drive API via `googleapis`
+- Native `request.formData()` for multipart upload parsing
+- PostgreSQL + Prisma
+- Basic Auth middleware
+- Google OAuth connect flow
+
+## Setup
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create a local PostgreSQL database first. Prisma migrations create tables inside an existing database; they do not install PostgreSQL or usually create the database name for you.
+
+Example database name:
+
+```text
+drive_upload_web
+```
+
+Using `psql`:
+
+```bash
+psql -U postgres
+```
+
+Then run:
+
+```sql
+CREATE DATABASE drive_upload_web;
+```
+
+Or create the same database from pgAdmin.
+
+Create `.env.local` from `.env.example` after PostgreSQL is ready:
+
+```env
+DATABASE_URL="postgresql://postgres:your_password@localhost:5432/drive_upload_web"
+ENCRYPTION_KEY="base64_32_byte_key"
+
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3000/api/google/oauth/callback
+
+BASIC_AUTH_USER=admin
+BASIC_AUTH_PASSWORD=
+```
+
+Environment variables:
+
+- `DATABASE_URL`: PostgreSQL connection string.
+- `ENCRYPTION_KEY`: base64-encoded 32-byte key used to encrypt Google refresh tokens. Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`.
+- `GOOGLE_OAUTH_CLIENT_ID`: Google OAuth client ID.
+- `GOOGLE_OAUTH_CLIENT_SECRET`: Google OAuth client secret.
+- `GOOGLE_OAUTH_REDIRECT_URI`: callback URL. Must match Google Cloud Console.
+- `BASIC_AUTH_USER`: Basic Auth username.
+- `BASIC_AUTH_PASSWORD`: Basic Auth password.
+
+Generate `ENCRYPTION_KEY`:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+Copy the output into `.env.local`.
+
+Run database migration:
+
+```bash
+npx prisma migrate dev
+```
+
+This creates the application tables in PostgreSQL:
+
+```text
+DriveAccount
+DriveFolder
+UploadSession
+UploadFile
+```
+
+If you get an error like `database "drive_upload_web" does not exist`, create the database first and run the migration again.
+
+## Run Locally
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+If you changed `.env.local`, restart the dev server. Next.js does not reliably reload server-side environment variables without restarting.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## First-Time Local Flow
 
-## Learn More
+```text
+1. Install PostgreSQL and start the PostgreSQL service.
+2. Create database: drive_upload_web.
+3. Copy .env.example to .env.local.
+4. Fill DATABASE_URL, ENCRYPTION_KEY, Google OAuth envs, and Basic Auth envs.
+5. Run npx prisma migrate dev.
+6. Run npm run dev.
+7. Open /admin/drive-accounts.
+8. Click Connect Google Drive.
+9. Create a mapped top-level folder under the connected Drive account.
+10. Go to / and upload files into the selected Drive account/folder.
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Upload Behavior
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Drive account flow:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```text
+/admin/drive-accounts
+  -> Connect Google Drive
+  -> Google OAuth consent
+  -> account refresh token encrypted in PostgreSQL
+```
 
-## Deploy on Vercel
+Mapped folder structure:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```text
+Selected Google Drive Account
++-- Project_X
+|   +-- Images
+|   +-- Videos
++-- Client_Y
+    +-- Images
+    +-- Videos
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Upload modes:
+
+- `SEQUENTIAL`: uploads all images first, then uploads all videos.
+- `PARALLEL`: uploads image group and video group concurrently; each group uploads files sequentially internally.
+
+Unsupported files are not uploaded and are returned in the result.
+
+## Scripts
+
+```bash
+npm run dev
+npm run lint
+npm run build
+npm run start
+```
+
+## Notes
+
+- Drive accounts are connected through Google OAuth from `/admin/drive-accounts`.
+- Top-level folders are created from `/admin/drive-accounts/[id]/folders` and mapped in PostgreSQL.
+- Duplicate file names are allowed because Google Drive supports multiple files with the same name in one folder.
+- Deleting a Drive account or mapped folder deletes the related Google Drive folders and cascades related upload history in PostgreSQL after explicit confirmation.
+- This version does not include CLI, pause/resume/cancel, or realtime byte-level progress.
