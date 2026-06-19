@@ -29,7 +29,7 @@ export default async function DriveAccountsPage() {
             <p className="mt-2 text-sm text-zinc-300">Connect Google accounts, manage mapped folders, and delete with explicit confirmation.</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link className="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-zinc-950" href="/api/google/oauth/start">Connect Google Drive</Link>
+            <a className="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-zinc-950" href="/api/google/oauth/start">Connect Google Drive</a>
             <Link className="rounded-2xl border border-white/20 px-4 py-3 text-sm font-bold text-white" href="/">Upload page</Link>
           </div>
         </header>
